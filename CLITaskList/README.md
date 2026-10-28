@@ -6,4 +6,4 @@ The data/data.json file **MUST** begin with '[' and end with ']' *OTHERWISE* dat
 $ tasklist [-h --help]
 Usage: tasklist [options] <description>
 ```
-
+.
