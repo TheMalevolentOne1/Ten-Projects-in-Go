@@ -26,6 +26,7 @@ func toLower(x string) string {
 const addCmd = "add"
 const removeCmd = "remove"
 const allCmd = "all"
+const test = "test"
 
 // Program Starting Point
 func main() {
@@ -51,6 +52,11 @@ func main() {
 	subcommand := toLower(os.Args[1]) // all, add, remove
 
 	switch subcommand {
+	case test:
+		fmt.Println(byte(int(1)))
+		fmt.Println(byte(1))
+		return
+
 	case allCmd:
 		tasks.ShowAllTasks()
 		return
@@ -85,17 +91,17 @@ func main() {
 			return
 		}
 
-		var task_id int
+		var taskId int
 
 		if id, err := strconv.Atoi(os.Args[2]); err != nil { // uses string convert - ascii to integer to parse integer from string e.g. "3" -> 3
 			fmt.Println("Task ID provided is not a number!")
 			return
 		} else {
-			task_id = id
+			taskId = id
 		}
 
-		if tPos, err := tasks.FindIDTask(task_id); err == nil {
-			tasks.RemoveTask(tPos)
+		if tS, tE, err := tasks.FindIDPositions(taskId); err == nil {
+			tasks.RemoveTask(tS, tE)
 		} else {
 			fmt.Println(err)
 		}

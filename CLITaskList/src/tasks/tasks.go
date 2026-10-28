@@ -10,6 +10,7 @@ import (
 	"fmt"           // Format for console display
 	"os"            // OS for arguments
 	"path/filepath" // For Filepath handling
+	"strconv"
 )
 
 type Task struct {
@@ -179,37 +180,68 @@ func SaveTask(t Task) error {
 	return nil
 }
 
-// TODO: ID numbers could overlap as based on size.
-// - Some ID Correction function should be implemented to ensure the numbers are accurate;
-// Lazier Method: Scratching that overwriting the IDs to be manually accurate 1,2,3,3,5 to 1,2,3,4,5.
-// Problem: Loses integrity of the original ID... The Wrong ID could be deleted in sequential updates.
-// No undo or error mitigation handling...
+/*
+	TODO: ID numbers could overlap as based on size.
+
+- Some ID Correction function should be implemented to ensure the numbers are accurate;
+Lazier Method: Scratching that overwriting the IDs to be manually accurate 1,2,3,3,5 to 1,2,3,4,5.
+Problem: Loses integrity of the original ID... The Wrong ID could be deleted in sequential updates.
+No undo or error mitigation handling...
+*/
 func fixIDNumbers() {
 
 }
 
-// FindID ensures that the Task ID is found and the first { position is returned.
-func FindIDTask(id int) (int, error) {
+/*
+FindIDPos ensures that the Task ID is found and the first { position is returned.
+Parameters
+*/
+func FindIDPositions(id int) (openCurly int, closedCurly int, err error) {
+	data, err := os.ReadFile(filePath)
+
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
-	for i := 0; i < len(Tasks); i++ {
-		if Tasks[i].Id == id {
-			return i, nil
-		} else {
-			continue
+	tmpN := 0
+
+	for i := 0; i <= len(data)-1; i++ {
+		if tmpN == 0 {
+			if data[i] == '{' {
+				tmpN = i
+				fmt.Println("tmpN done.")
+			}
+		} else if string(data[i]) == strconv.Itoa(id) {
+			fmt.Println("Found Open Curly for ID on Line: ", tmpN)
+			openCurly = tmpN
+		}
+
+		if data[i] == '}' && tmpN != 0 {
+			closedCurly = i
+			fmt.Printf("Found Close Curly: %v - ID JSON POSITIONS FOUND.", closedCurly)
+			break
 		}
 	}
 
-	return id, nil
+	return openCurly, closedCurly, err
+}
+
+// Remove ensures that the starting position and ending position in the data provided is spliced out and the rest of the data is returned.
+func remove(tStart int, tEnd int, data []byte) []byte {
+	if len(data) <= 0 || tStart >= len(data) {
+		return data
+	}
+
+	return append(data[:tStart], data[tEnd:]...) // The variadic operator ... spread in JS (append expects variable so slice requires unpacking.)
 }
 
 // RemoveTask ensures a task is removed from the JSON file using the first curly bracket then deleting all subsequent bytes adding a comma if necessary.
-func RemoveTask(tPos int) error {
+func RemoveTask(tOpenCurly int, tClosedCurly int) error {
 	if !doesStorageExist() {
-		return nil
-	} // Verify Array in File.
+		return fmt.Errorf("Storage does not exist.")
+	}
+
+	tClosedCurly += 3 // for the "}, "
 
 	data, err := os.ReadFile(filePath)
 
@@ -217,29 +249,11 @@ func RemoveTask(tPos int) error {
 		return err
 	}
 
-	openCurlyCount := 0
-	closedCurlyCount := 0
+	err2 := os.WriteFile(filePath, remove(tOpenCurly, tClosedCurly, data), filePerm)
 
-	jsonTaskPoss := []int{}
-
-	for i := 0; i < len(data); i++ {
-		if i == '{' {
-			openCurlyCount++
-			jsonTaskPoss = append(jsonTaskPoss, i)
-		} else if i == '}' {
-			if i == len(data)-1 && closedCurlyCount != openCurlyCount {
-				fmt.Println("Data is missing valid '}' for '{' starts on Line: ") // TODO
-				openCurlyCount--
-				continue
-			}
-
-			closedCurlyCount++
-		}
+	if err2 != nil {
+		return err2
 	}
-
-	fmt.Println(openCurlyCount)
-	fmt.Println(closedCurlyCount)
-	fmt.Printf("%v", jsonTaskPoss)
 
 	return nil
 }
