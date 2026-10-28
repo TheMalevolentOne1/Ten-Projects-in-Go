@@ -191,7 +191,7 @@ func doesIdExists(id int) (tPos int, err error) {
 	}
 }
 
-// RemoveTask ensures a task is removed from the JSON file using the first curly bracket then deleting all subsequent bytes adding a comma if necessary.
+// RemoveTask ensures a task is removed from the Tasks Struct Slice using the Task ID.
 func RemoveTask(tID int) error {
 	if !doesStorageExist() {
 		return errors.New("Storage does not exist.")
@@ -203,7 +203,11 @@ func RemoveTask(tID int) error {
 		return err
 	}
 
-	tasks = append(tasks[:tPos], tasks[(tPos+1):]...)
+	if len(tasks) <= 1 {
+		tasks = tasks[:0]
+	} else {
+		tasks = append(tasks[:tPos], tasks[(tPos+1):]...)
+	}
 
 	fmt.Println(tasks)
 
@@ -211,22 +215,19 @@ func RemoveTask(tID int) error {
 }
 
 func SaveAllTasks() (err error) {
-	if len(tasks) <= 0 {
-		return errors.New("No Tasks To Save.")
-	}
-
 	encodedTasks, err := json.Marshal(&tasks)
 
 	if err != nil {
 		return err
 	}
 
+	fmt.Println(tasks)
+
 	err2 := os.WriteFile(filePath, encodedTasks, filePerm)
 
 	if err2 != nil {
 		return err2
 	} else {
-		fmt.Println("Should be saved...")
 		return nil
 	}
 }
