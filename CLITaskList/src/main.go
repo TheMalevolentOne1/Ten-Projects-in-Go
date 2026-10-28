@@ -69,45 +69,38 @@ func main() {
 
 		taskName := os.Args[2]
 		taskDesc := ""
+
 		if len(os.Args) >= 4 {
 			taskDesc = os.Args[3]
 		}
 
-		newTask := tasks.Task{
-			Id:          tasks.GetNextTaskID(),
-			Name:        taskName,
-			Description: taskDesc,
-		}
-		if err := tasks.SaveTask(newTask); err != nil {
+		if err := tasks.AddTask(taskName, taskDesc); err != nil {
 			fmt.Println(err)
 			fmt.Println("Task Not Saved.")
 			return
 		}
-		fmt.Println("Task Saved.")
+
+		fmt.Println("Task Added.")
 
 	case removeCmd:
-		if len(os.Args) < 2 {
+		if len(os.Args) < 3 {
 			fmt.Println("Missing Task ID")
 			return
 		}
 
-		var taskId int
+		var taskId string = os.Args[2]
 
-		if id, err := strconv.Atoi(os.Args[2]); err != nil { // uses string convert - ascii to integer to parse integer from string e.g. "3" -> 3
+		if id, err := strconv.Atoi(taskId); err != nil { // uses string convert - ascii to integer to parse integer from string e.g. "3" -> 3
 			fmt.Println("Task ID provided is not a number!")
 			return
 		} else {
-			taskId = id
-		}
+			err := tasks.RemoveTask(id)
 
-		if tS, tE, err := tasks.FindIDPositions(taskId); err == nil {
-			err := tasks.RemoveTask(tS, tE)
 			if err != nil {
 				fmt.Println(err)
 			}
-		} else {
-			fmt.Println(err)
 		}
+
 	case "help":
 		fmt.Println(`
 		HELP MENU
@@ -121,4 +114,6 @@ func main() {
 	default:
 		fmt.Println("Argument Not Recognised")
 	}
+
+	tasks.SaveAllTasks()
 }

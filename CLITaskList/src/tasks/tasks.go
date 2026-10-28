@@ -7,10 +7,10 @@ Handles Tasks Struct, and Task Management.
 
 import (
 	"encoding/json" // For JSON handling
+	"errors"        // For Error Handling
 	"fmt"           // Format for console display
 	"os"            // OS for arguments
 	"path/filepath" // For Filepath handling
-	"strconv"
 )
 
 type Task struct {
@@ -24,7 +24,7 @@ const header string = `
 | TASKLIST MANAGER   |
 |--------------------|`
 
-var Tasks []Task
+var tasks []Task
 
 const file = "data/tasks.json"
 
@@ -34,21 +34,21 @@ var filePath string = filepath.Join(dir, file) // json data file path
 
 var filePerm = os.FileMode(0600) // tasks.json file with appropriate read and write perms for the owner.
 
-func GetNextTaskID() int {
-	return len(Tasks) + 1
+func getNextTaskID() int {
+	return len(tasks) - 1 // To Match Indexes
 }
 
 func ShowAllTasks() {
-	if lenTasks := len(Tasks); lenTasks == 0 {
+	if lenTasks := len(tasks); lenTasks == 0 {
 		fmt.Println(header)
 		fmt.Println("No Tasks.")
 	} else {
 		fmt.Println(header)
 		for i := range lenTasks {
 			fmt.Printf("Task Number: %d \nTask: %s \nDescription: %s \n",
-				Tasks[i].Id,
-				Tasks[i].Name,
-				Tasks[i].Description,
+				tasks[i].Id,
+				tasks[i].Name,
+				tasks[i].Description,
 			)
 		}
 	}
@@ -76,7 +76,7 @@ b - bytes (the bytes of JSON data)
 */
 func DecodeAllJSONTasks() error { // Load JSON File into Tasks Struct Memory
 	if b, err := os.ReadFile(filePath); err == nil {
-		err = json.Unmarshal(b, &Tasks) // Decode JSON into Tasks Struct using its Reference.
+		err = json.Unmarshal(b, &tasks) // Decode JSON into Tasks Struct using its Reference.
 		if err != nil {
 			return err
 		}
@@ -153,120 +153,80 @@ func EnsureStorageExists() bool {
 }
 
 // SaveTask ensures that a single Task is encoded into JSON and saved into the tasks.json file.
-func SaveTask(t Task) error {
-	var taskEncoded []byte
-
-	if tJSON, err := encodeJSONTask(t); err == nil {
-		taskEncoded = tJSON
-	} else {
-		return err
+func AddTask(tName string, tDesc string) error {
+	// Add New Task to Tasks
+	newTask := Task{
+		Id:          getNextTaskID(),
+		Name:        tName,
+		Description: tDesc,
 	}
 
-	if data, err := os.ReadFile(filePath); err == nil {
-		// Remove Last Element of Slice Source: https://stackoverflow.com/questions/26172196/how-to-remove-the-last-element-from-a-slice
-		data = data[:len(data)-1]     // Remove ]
-		if data[len(data)-1] == '}' { // Ensure Previous Char is closing '}' bracket
-			data = append(data, []byte(", ")...) // add ,
-		}
-		data = append(data, taskEncoded...)           // append JSON Task
-		data = append(data, ']')                      // ] end the array.
-		err := os.WriteFile(filePath, data, filePerm) // Replace old file bytes with new.
-		if err != nil {
-			return err
-		}
-	} else {
-		return err
-	}
+	tasks = append(tasks, newTask)
 
 	return nil
-}
-
-/*
-	TODO: ID numbers could overlap NextID is based on size of Tasks.
-
-- Some ID Correction function should be implemented to ensure the numbers are accurate;
-Lazier Method: Scratching that overwriting the IDs to be manually accurate 1,2,3,3,5 to 1,2,3,4,5.
-Problem: Loses integrity of the original ID... The Wrong ID could be deleted in sequential updates.
-No undo or error mitigation handling...
-*/
-func fixIDs() {
-
 }
 
 /*
 FindIDPos ensures that the Task ID is found and the first { position is returned.
 Parameters
 */
-func FindIDPositions(id int) (openCurly int, closedCurly int, err error) {
+func doesIdExists(id int) (tPos int, err error) {
 	checkIDExists := false
 
-	for i := range Tasks {
-		if Tasks[i].Id == id {
-			checkIDExists = true
+	for i := range tasks {
+		if checkIDExists {
+			break
+		} else {
+			if tasks[i].Id == id {
+				checkIDExists = true
+				tPos = i
+			}
 		}
 	}
 
 	if !checkIDExists {
-		return 0, 0, fmt.Errorf("ID doesn't exist.")
+		return 0, errors.New("ID cannot be found.")
+	} else {
+		return tPos, nil
 	}
-
-	data, err := os.ReadFile(filePath)
-
-	if err != nil {
-		return 0, 0, err
-	}
-
-	tmpN := 0
-
-	idFound := false
-
-	for i := 0; i <= len(data)-1; i++ {
-		if data[i] == '{' {
-			tmpN = i
-		} else if string(data[tmpN+1:tmpN+5]) == `"Id"` && string(data[i]) == strconv.Itoa(id) {
-			fmt.Println("Found Open Curly for ID on Line: ", tmpN)
-			openCurly = tmpN
-			idFound = true
-		}
-
-		if data[i] == '}' && idFound {
-			closedCurly = i
-			fmt.Printf("Found Close Curly: %v - ID JSON POSITIONS FOUND.", closedCurly)
-			break
-		}
-	}
-
-	return openCurly, closedCurly, err
-}
-
-// Remove ensures that the starting position and ending position in the data provided is spliced out and the rest of the data is returned.
-func remove(tStart int, tEnd int, data []byte) []byte {
-	if len(data) <= 0 || tStart < 0 || tStart > tEnd || tEnd >= len(data) {
-		return data
-	}
-
-	return append(data[:tStart], data[tEnd:]...) // The variadic operator ... spread in JS (append expects variable so slice requires unpacking.)
 }
 
 // RemoveTask ensures a task is removed from the JSON file using the first curly bracket then deleting all subsequent bytes adding a comma if necessary.
-func RemoveTask(tOpenCurly int, tClosedCurly int) error {
+func RemoveTask(tID int) error {
 	if !doesStorageExist() {
-		return fmt.Errorf("Storage does not exist.")
+		return errors.New("Storage does not exist.")
 	}
 
-	tClosedCurly += 3 // for the "}, "
-
-	data, err := os.ReadFile(filePath)
+	tPos, err := doesIdExists(tID)
 
 	if err != nil {
 		return err
 	}
 
-	err2 := os.WriteFile(filePath, remove(tOpenCurly, tClosedCurly, data), filePerm)
+	tasks = append(tasks[:tPos], tasks[(tPos+1):]...)
+
+	fmt.Println(tasks)
+
+	return nil
+}
+
+func SaveAllTasks() (err error) {
+	if len(tasks) <= 0 {
+		return errors.New("No Tasks To Save.")
+	}
+
+	encodedTasks, err := json.Marshal(&tasks)
+
+	if err != nil {
+		return err
+	}
+
+	err2 := os.WriteFile(filePath, encodedTasks, filePerm)
 
 	if err2 != nil {
 		return err2
+	} else {
+		fmt.Println("Should be saved...")
+		return nil
 	}
-
-	return nil
 }
