@@ -29,7 +29,7 @@ func main() {
 	}
 
 	if !tasks.EnsureStorageExists() {
-		fmt.Println("Storage could not be created.")
+		fmt.Println("| Storage could not be created. |")
 		return
 	}
 

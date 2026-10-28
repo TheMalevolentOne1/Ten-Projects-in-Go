@@ -13,7 +13,7 @@ import (
 	"path/filepath" // For Filepath handling
 )
 
-type Task struct {
+type task struct {
 	Id          int
 	Name        string
 	Description string
@@ -24,7 +24,7 @@ const header string = `
 | TASKLIST MANAGER   |
 |--------------------|`
 
-var tasks []Task
+var tasks []task
 
 const file = "data/tasks.json"
 
@@ -38,9 +38,9 @@ func getNextTaskID() int {
 	return len(tasks)
 }
 
-func doesIdExist() bool {
+func doesIdExist(tId int) bool {
 	for i := range tasks {
-		if tasks[i].Id == i {
+		if tasks[i].Id == tId {
 			return true
 		}
 	}
@@ -150,7 +150,7 @@ func EnsureStorageExists() bool {
 // SaveTask ensures that a single Task is encoded into JSON and saved into the tasks.json file.
 func AddTask(tName string, tDesc string) error {
 	// Add New Task to Tasks
-	newTask := Task{
+	newTask := task{
 		Id:          getNextTaskID(),
 		Name:        tName,
 		Description: tDesc,
