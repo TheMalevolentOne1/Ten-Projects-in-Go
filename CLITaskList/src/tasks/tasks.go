@@ -31,8 +31,9 @@ var dir, err = os.Getwd() // GetWorkingDirectory
 
 var filePath string = filepath.Join(dir, file) // json data file path
 
+var filePerm = os.FileMode(0600) // data.json file with appropriate read and write perms for the owner.
+
 func GetNextTaskID() int {
-	fmt.Println(Tasks)
 	return len(Tasks) + 1
 }
 
@@ -53,7 +54,7 @@ func ShowAllTasks() {
 }
 
 /*
-encodeJSONTask ensures that the Task Struct argument is encoded into json and returned otherwise an error is returned without the bytes.
+encodeJSONTask ensures that the Task Struct t is encoded into json (returned as []byte) and otherwise an error is returned.
 Parameters:
 b - bytes (the bytes of the Tasks slice)
 */
@@ -74,7 +75,7 @@ b - bytes (the bytes of JSON data)
 */
 func DecodeAllJSONTasks() error { // Load JSON File into Tasks Struct Memory
 	if b, err := os.ReadFile(filePath); err == nil {
-		err = json.Unmarshal(b, &Tasks) // Decode JSON into Tasks Struct
+		err = json.Unmarshal(b, &Tasks) // Decode JSON into Tasks Struct using its Reference.
 		if err != nil {
 			return err
 		}
@@ -83,12 +84,40 @@ func DecodeAllJSONTasks() error { // Load JSON File into Tasks Struct Memory
 	return nil
 }
 
+// verifyStorageAccess ensures valid permissions on the data.json file for Read and Write access.
+func verifyStorageAccess() (bool, error) {
+	info, err := os.Stat(filePath)
+
+	if err != nil {
+		return false, err
+	}
+
+	if perm := info.Mode().Perm(); perm != os.FileMode(0600) {
+		//panic("Insufficient File Permissions")
+		// TODO: Change using Chmod? Ask user first (not prod so skip.)
+
+		err := os.Chmod(filePath, filePerm) // Attempt to change file permissions.
+
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	} else {
+		return true, nil
+	}
+}
+
 // doesStorageExist ensures json file exists with [ bytes at the start and end ]
 // returns boolean with result if exists, with valid empty slice.
 func doesStorageExist() bool {
+	if hasAccess, err := verifyStorageAccess(); hasAccess == false && err != nil {
+		fmt.Println(err)
+		return false
+	}
 	if _, err := os.Stat(filePath); err == nil {
 		if data, err := os.ReadFile(filePath); err == nil {
-			// confirm length contains at least two and [ and ] and CORRECT BYTES [91, 93]
+			// confirm length contains at least two and [ and ]
 			if len(data) >= 2 && data[0] == '[' && data[len(data)-1] == ']' {
 				return true
 			}
@@ -98,8 +127,6 @@ func doesStorageExist() bool {
 	return false
 }
 
-var filePerm = os.ModeAppend.Type().Perm()
-
 /*
 EnsureStorageExists ensures the storage exists, and if it doesn't create it.
 Returnn Boolean whether creation was successful or already exists.
@@ -108,24 +135,18 @@ func EnsureStorageExists() bool {
 	// if storage exists but doesn't contain the 91 and 93 bytes at start and end it will overwrite.
 	if !doesStorageExist() {
 		fmt.Println(header)
-		os.Mkdir("data", filePerm) // create data folder, with 0655 perms (Owner: rwx, Everyone Else: r-x)
-
-		fmt.Println(filePath)
+		os.Mkdir("data", filePerm) // create data folder, with 0777 perms for simplicity
 
 		// create a tasks.json file in data directory
 		// file contents stored in an empty array in bytes
 		err = os.WriteFile(filePath, []byte("[]"), filePerm)
 
-		fmt.Println("Storage Made. - Path - ", filePath)
-
 		if err != nil {
-			fmt.Println(err)
 			return false
 		} else {
 			return true
 		}
 	} else {
-		fmt.Println(filePath)
 		return true
 	}
 }
@@ -142,16 +163,20 @@ func SaveTask(t Task) error {
 	if data, err := os.ReadFile(filePath); err == nil {
 		// Remove Last Element of Slice Source: https://stackoverflow.com/questions/26172196/how-to-remove-the-last-element-from-a-slice
 		data = data[:len(data)-1]     // Remove ]
-		if data[len(data)-1] == '}' { // Ensure previous is closing json tag
-			data = append(data, []byte(", ")...) // ,
+		if data[len(data)-1] == '}' { // Ensure Previous Char is closing '}' bracket
+			data = append(data, []byte(", ")...) // add ,
 		}
-		data = append(data, taskEncoded...) // add JSON
-		data = append(data, ']')            // ] end the array.
-		os.WriteFile(filePath, data, filePerm)
-		return nil
+		data = append(data, taskEncoded...)           // append JSON Task
+		data = append(data, ']')                      // ] end the array.
+		err := os.WriteFile(filePath, data, filePerm) // Replace old file bytes with new.
+		if err != nil {
+			return err
+		}
 	} else {
-		return nil
+		return err
 	}
+
+	return nil
 }
 
 // TODO: ID numbers could overlap as based on size.
@@ -182,35 +207,39 @@ func FindIDTask(id int) (int, error) {
 
 // RemoveTask ensures a task is removed from the JSON file using the first curly bracket then deleting all subsequent bytes adding a comma if necessary.
 func RemoveTask(tPos int) error {
+	if !doesStorageExist() {
+		return nil
+	} // Verify Array in File.
+
 	data, err := os.ReadFile(filePath)
 
 	if err != nil {
 		return err
 	}
 
-	var jsonStartPos int
-	var jsonEndPos int
+	openCurlyCount := 0
+	closedCurlyCount := 0
 
-	count := 0
+	jsonTaskPoss := []int{}
 
-	for i, jsonPos := range data {
-		if count != tPos && jsonPos == '{' {
-			count++
-		}
+	for i := 0; i < len(data); i++ {
+		if i == '{' {
+			openCurlyCount++
+			jsonTaskPoss = append(jsonTaskPoss, i)
+		} else if i == '}' {
+			if i == len(data)-1 && closedCurlyCount != openCurlyCount {
+				fmt.Println("Data is missing valid '}' for '{' starts on Line: ") // TODO
+				openCurlyCount--
+				continue
+			}
 
-		if count == tPos && jsonPos == '{' { // find the { when the right index is located for Task
-			jsonStartPos = i
-		}
-
-		if count == tPos && jsonPos == '}' {
-			jsonEndPos = i
-			break
+			closedCurlyCount++
 		}
 	}
 
-	fmt.Println(count)
-	fmt.Println(jsonStartPos)
-	fmt.Println(jsonEndPos)
+	fmt.Println(openCurlyCount)
+	fmt.Println(closedCurlyCount)
+	fmt.Printf("%v", jsonTaskPoss)
 
 	return nil
 }

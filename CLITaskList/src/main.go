@@ -38,8 +38,6 @@ func main() {
 	if !tasks.EnsureStorageExists() {
 		fmt.Println("Storage could not be created.")
 		return
-	} else {
-		fmt.Println("Storage Confirmed")
 	}
 
 	err := tasks.DecodeAllJSONTasks() // Decode Existing JSON Data and Populate Tasks Struct.
@@ -48,9 +46,6 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-
-	fmt.Println("Tasks:")
-	fmt.Println(tasks.Tasks)
 
 	// Ensure Subcommand Exists
 	subcommand := toLower(os.Args[1]) // all, add, remove
@@ -92,8 +87,9 @@ func main() {
 
 		var task_id int
 
-		if id, err := strconv.Atoi(os.Args[2]); err != nil {
+		if id, err := strconv.Atoi(os.Args[2]); err != nil { // uses string convert - ascii to integer to parse integer from string e.g. "3" -> 3
 			fmt.Println("Task ID provided is not a number!")
+			return
 		} else {
 			task_id = id
 		}
@@ -111,9 +107,9 @@ func main() {
 
 		Commands:
 		tasklist all
-		tasklist add <TASK_NAME> [DESCRIPTION]
-		tasklist remove [--list] <TASK_ID>`)
+		tasklist add <TASK_NAME> [DESCRIPTION] if Desc Empty then Empty Body.
+		tasklist `)
 	default:
-		fmt.Println("Argument Not Recognised - Seek, Help.")
+		fmt.Println("Argument Not Recognised")
 	}
 }
