@@ -32,7 +32,7 @@ var dir, err = os.Getwd() // GetWorkingDirectory
 
 var filePath string = filepath.Join(dir, file) // json data file path
 
-var filePerm = os.FileMode(0600) // data.json file with appropriate read and write perms for the owner.
+var filePerm = os.FileMode(0600) // tasks.json file with appropriate read and write perms for the owner.
 
 func GetNextTaskID() int {
 	return len(Tasks) + 1
@@ -85,7 +85,7 @@ func DecodeAllJSONTasks() error { // Load JSON File into Tasks Struct Memory
 	return nil
 }
 
-// verifyStorageAccess ensures valid permissions on the data.json file for Read and Write access.
+// verifyStorageAccess ensures valid permissions on the tasks.json file for Read and Write access.
 func verifyStorageAccess() (bool, error) {
 	info, err := os.Stat(filePath)
 
@@ -95,7 +95,7 @@ func verifyStorageAccess() (bool, error) {
 
 	if perm := info.Mode().Perm(); perm != os.FileMode(0600) {
 		//panic("Insufficient File Permissions")
-		// TODO: Change using Chmod? Ask user first (not prod so skip.)
+		// TODO: Change using Chmod? Ask user first? (not prod so skip.)
 
 		err := os.Chmod(filePath, filePerm) // Attempt to change file permissions.
 
@@ -152,6 +152,7 @@ func EnsureStorageExists() bool {
 	}
 }
 
+// SaveTask ensures that a single Task is encoded into JSON and saved into the tasks.json file.
 func SaveTask(t Task) error {
 	var taskEncoded []byte
 
@@ -181,14 +182,14 @@ func SaveTask(t Task) error {
 }
 
 /*
-	TODO: ID numbers could overlap as based on size.
+	TODO: ID numbers could overlap NextID is based on size of Tasks.
 
 - Some ID Correction function should be implemented to ensure the numbers are accurate;
 Lazier Method: Scratching that overwriting the IDs to be manually accurate 1,2,3,3,5 to 1,2,3,4,5.
 Problem: Loses integrity of the original ID... The Wrong ID could be deleted in sequential updates.
 No undo or error mitigation handling...
 */
-func fixIDNumbers() {
+func fixIDs() {
 
 }
 
@@ -197,6 +198,18 @@ FindIDPos ensures that the Task ID is found and the first { position is returned
 Parameters
 */
 func FindIDPositions(id int) (openCurly int, closedCurly int, err error) {
+	checkIDExists := false
+
+	for i := range Tasks {
+		if Tasks[i].Id == id {
+			checkIDExists = true
+		}
+	}
+
+	if !checkIDExists {
+		return 0, 0, fmt.Errorf("ID doesn't exist.")
+	}
+
 	data, err := os.ReadFile(filePath)
 
 	if err != nil {
@@ -205,18 +218,18 @@ func FindIDPositions(id int) (openCurly int, closedCurly int, err error) {
 
 	tmpN := 0
 
+	idFound := false
+
 	for i := 0; i <= len(data)-1; i++ {
-		if tmpN == 0 {
-			if data[i] == '{' {
-				tmpN = i
-				fmt.Println("tmpN done.")
-			}
-		} else if string(data[i]) == strconv.Itoa(id) {
+		if data[i] == '{' {
+			tmpN = i
+		} else if string(data[tmpN+1:tmpN+5]) == `"Id"` && string(data[i]) == strconv.Itoa(id) {
 			fmt.Println("Found Open Curly for ID on Line: ", tmpN)
 			openCurly = tmpN
+			idFound = true
 		}
 
-		if data[i] == '}' && tmpN != 0 {
+		if data[i] == '}' && idFound {
 			closedCurly = i
 			fmt.Printf("Found Close Curly: %v - ID JSON POSITIONS FOUND.", closedCurly)
 			break
@@ -228,7 +241,7 @@ func FindIDPositions(id int) (openCurly int, closedCurly int, err error) {
 
 // Remove ensures that the starting position and ending position in the data provided is spliced out and the rest of the data is returned.
 func remove(tStart int, tEnd int, data []byte) []byte {
-	if len(data) <= 0 || tStart >= len(data) {
+	if len(data) <= 0 || tStart < 0 || tStart > tEnd || tEnd >= len(data) {
 		return data
 	}
 

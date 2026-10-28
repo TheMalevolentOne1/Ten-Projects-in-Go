@@ -101,7 +101,10 @@ func main() {
 		}
 
 		if tS, tE, err := tasks.FindIDPositions(taskId); err == nil {
-			tasks.RemoveTask(tS, tE)
+			err := tasks.RemoveTask(tS, tE)
+			if err != nil {
+				fmt.Println(err)
+			}
 		} else {
 			fmt.Println(err)
 		}
