@@ -35,7 +35,17 @@ var filePath string = filepath.Join(dir, file) // json data file path
 var filePerm = os.FileMode(0600) // tasks.json file with appropriate read and write perms for the owner.
 
 func getNextTaskID() int {
-	return len(tasks) - 1 // To Match Indexes
+	return len(tasks)
+}
+
+func doesIdExist() bool {
+	for i := range tasks {
+		if tasks[i].Id == i {
+			return true
+		}
+	}
+
+	return false
 }
 
 func ShowAllTasks() {
@@ -51,21 +61,6 @@ func ShowAllTasks() {
 				tasks[i].Description,
 			)
 		}
-	}
-}
-
-/*
-encodeJSONTask ensures that the Task Struct t is encoded into json (returned as []byte) and otherwise an error is returned.
-Parameters:
-b - bytes (the bytes of the Tasks slice)
-*/
-func encodeJSONTask(t Task) ([]byte, error) {
-	data, err := json.Marshal(t)
-
-	if err != nil {
-		return nil, err
-	} else {
-		return data, nil
 	}
 }
 
@@ -170,7 +165,7 @@ func AddTask(tName string, tDesc string) error {
 FindIDPos ensures that the Task ID is found and the first { position is returned.
 Parameters
 */
-func doesIdExists(id int) (tPos int, err error) {
+func findIdPos(id int) (tPos int, err error) {
 	checkIDExists := false
 
 	for i := range tasks {
@@ -197,7 +192,7 @@ func RemoveTask(tID int) error {
 		return errors.New("Storage does not exist.")
 	}
 
-	tPos, err := doesIdExists(tID)
+	tPos, err := findIdPos(tID)
 
 	if err != nil {
 		return err
@@ -209,8 +204,6 @@ func RemoveTask(tID int) error {
 		tasks = append(tasks[:tPos], tasks[(tPos+1):]...)
 	}
 
-	fmt.Println(tasks)
-
 	return nil
 }
 
@@ -220,8 +213,6 @@ func SaveAllTasks() (err error) {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(tasks)
 
 	err2 := os.WriteFile(filePath, encodedTasks, filePerm)
 

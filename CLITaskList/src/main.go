@@ -15,14 +15,6 @@ import (
 	"tasklist/tasks" // Tasks Exported Functions
 )
 
-func toLower(x string) string {
-	var newStr string = ""
-	for i := 0; i < len(x); i++ {
-		newStr += strings.ToLower(string(x[i]))
-	}
-	return newStr
-}
-
 const addCmd = "add"
 const removeCmd = "remove"
 const allCmd = "all"
@@ -49,7 +41,7 @@ func main() {
 	}
 
 	// Ensure Subcommand Exists
-	subcommand := toLower(os.Args[1]) // all, add, remove
+	subcommand := strings.ToLower(os.Args[1]) // all, add, remove
 
 	switch subcommand {
 	case test:
