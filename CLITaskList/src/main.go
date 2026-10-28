@@ -102,7 +102,7 @@ func main() {
 		Commands:
 		tasklist all
 		tasklist add <TASK_NAME> [DESCRIPTION] if Desc Empty then Empty Body.
-		tasklist `)
+		tasklist remove <TASK_ID>`)
 	default:
 		fmt.Println("Argument Not Recognised")
 	}
